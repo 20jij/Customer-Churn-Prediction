@@ -1,0 +1,137 @@
+---
+title: "ISOM 454/554 Final Project"
+fontsize: 12pt
+spacing: double
+output: pdf_document
+---
+
+```{r}
+#Loading data
+churn <- read.csv('https://zhang-datasets.s3.us-east-2.amazonaws.com/telcoChurn.csv')
+summary(churn)
+```
+
+1. Inference: to help them understand what kind of customers are leaving and propose a retention plan to decrease churn and improve revenues
+```{r}
+# drop customer id and phone service column
+churn_new = churn[-c(1,7)]
+m = glm(factor(Churn)~., data=churn_new, family=binomial)
+summary(m)
+```
+For inference, I fitted a general linear regression to find covariates that are significant. From the model summary, we can see that significant covariates are SeniorCitizen, tenure, MultipleLinesYes, InternetServiceFiber optic, InternetServiceNo, ContractOne year, ContractTwo year, PaperlessBillingYes, PaymentMethodElectronic check, and TotalCharges.
+
+To understand the effects of these covariates on churn rate, we look at the exponential of the coefficients.
+```{r}
+exp(m$coefficients)
+```
+Therefore, the interpretations of the significant covariates are the followings:
+SeniorCitizen: odds of churn for a senior citizen increases by 24%
+tenure: if the year of being a customer increases by 1 unit, the odds of churn decreases by 6%
+MultipleLinesYes: if customer signs up for multiple lines as opposed to a single line, the odds of churn increases by 56%
+InternetServiceFiber optic: if customer signs up for fiber optic internet service as opposed to DSL, the odds of churn increases by 474%
+InternetServiceNo: if customer has no internet service as opposed to DSL, the odds of churn decreases by 83%
+ContractOne year: if customer signs up for a one year contract as opposed to month-to-month contract, the odds of churn decreases by 48%.
+ContractTwo year: if customer signs up for a two year contract as opposed to month-to-month contract, the odds of churn decreases by 74%.
+PaperlessBillingYes: if customer signs up for paperless billing as opposed to no paperless billing, the odds of churn increases by 41% 
+PaymentMethodElectronic check: if customer chooses to pay by electronic check as opposed to automatic bank transfer, the odds of churn increases by 36% 
+TotalCharges: if customer's total charge increases by 1 unit, the odds of churn increases by 0.03%.
+
+Finally, based on the above findings, we are able to develop a retention plan to decrease churn and improve revenues. 
+First, we want to increase the retention rate for senior citizens. We can start to build a new strategy to target senior citizens, for example creating internet packages that are more attractive to seniors. In addition, as tenure is positively correlated with churn decrease, we want to make sure that our customer start with our product and never switch to other brands. As for the type of internet service and number of lines that the customer chooses, a DSL internet service and a single line is preffered. However, this might decrease the overall sales/revenues based on how the services are charged, and we need to conduct additional research to identify the best approach to decrease churn and improve revenues at the same time. In addition, we want to market and sell longer 2 year contract, such as by offering discount, as they could drastically decrease odds of churn (74%). Finally, it is interesting to see how paperless billing and electronic check payment actually increase churn rate. Maybe it is because electronic/online payment makes it convenient for customers to stop the payment and switch. Therefore we should make no paperless billing and automatic bank transfer as the default payment method to decrease churn rate. 
+
+
+
+
+
+2. Prediction: to build a predictive model with high prediction accuracy. 
+
+```{r}
+library("MLmetrics")
+
+```
+
+```{r}
+library("caret")
+library("ISLR")
+```
+
+```{r}
+set.seed(1)
+churn_new <- na.omit(churn_new)
+churn_new$Churn<-ifelse(churn_new$Churn=="Yes",1,0)
+x=model.matrix(Churn~.,churn_new)[,-1] #[,-1] removes the intercept column
+y=churn_new$Churn
+trainid=sample(1:nrow(x), nrow(x)*0.8)
+testid=(-trainid)
+```
+
+```{r}
+library(dplyr)
+library(ISLR2)
+library(glmnet)
+library(keras)
+```
+
+```{r}
+#Build the model
+modnn <- keras_model_sequential() %>%
+      layer_dense(units = 256, activation = "relu",
+        input_shape = ncol(x)) %>%
+      layer_dropout(rate = 0.2) %>%
+      layer_dense(units = 256, activation = "relu") %>%
+      layer_dropout(rate = 0.2) %>%
+      layer_dense(units = 64, activation = "relu") %>%
+      layer_dropout(rate = 0.3) %>%
+      layer_dense(units = 1, activation = "sigmoid")
+```
+
+```{r}
+modnn %>% compile(loss = "binary_crossentropy",
+    optimizer = "adam",
+    metrics = list("accuracy")
+   )
+```
+
+
+```{r}
+#Fitting the model
+system.time(
+history <- modnn %>% fit(
+     x[-testid, ], y[-testid], epochs = 65, batch_size = 32,
+    validation_data = list(x[testid, ], y[testid])
+  )
+)
+```
+
+```{r}
+#Visualization 
+plot(history)
+```
+
+```{r}
+#Prediction
+npred <- predict(modnn, x[testid, ])
+```
+
+```{r}
+npred_new<-ifelse(npred > 0.25,1,0)
+```
+
+```{r}
+confusionMatrix(as.factor(npred_new), as.factor(y[testid]), mode = "everything", positive = "1")
+```
+
+
+```{r}
+#In this case, we built a deep neural network to try to predict customer churning. We obtained an F1 score of 0.6289 and accuracy of 0.7953. One thing to note that this data suffer from outcome variable imbalance, resulting in a extremely low sensitivity score of 0.3 if threshold = 0.5. As a result, the threshold has been lowered to 0.25 in order to maximize F1 score and increase sensitivity.
+```
+
+
+
+
+
+
+
+
+
+

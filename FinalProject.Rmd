@@ -1,0 +1,66 @@
+---
+title: "ISOM 454/554 Final Project"
+fontsize: 12pt
+spacing: double
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+\newpage
+
+__(II) Customer churns (GLM)__
+
+A telecommunications company is concerned about the number of customers leaving their landline business for cable competitors.  Your task is twofold with
+
+(T1) Inference: to help them understand what kind of customers are leaving and propose a retention plan to decrease churn and improve revenues;
+
+(T2) Prediction: to build a predictive model with high prediction accuracy. For this task, you can create your own training and testing data split for prediction accuracy evaluation. You can try a deep learning model to take this project to the next level but this is not required. 
+
+The data can be read in here - 'https://zhang-datasets.s3.us-east-2.amazonaws.com/telcoChurn.csv' - and includes information about:
+
+* If a customer left - the column is called Churn (i.e., Churn=1 means already left)
+* How long they've been a customer - the column is called tenure
+* Services that each customer has signed up for - phone, multiple lines, internet, online security, online backup, device protection, tech support, and streaming TV and movies
+* Customer account information - contract, payment method, paperless billing, monthly charges, and total charges
+* Demographic info about customers - gender, age range, and if they have partners and dependents
+
+Your response variable of interest is __Churn__.
+```{r}
+churn <- read.csv('https://zhang-datasets.s3.us-east-2.amazonaws.com/telcoChurn.csv')
+head(churn)
+```
+
+Note: when you consider variables to include in the model, be careful of the nested ones. For example, __PhoneService__ shows whether an account has phone service and __MultipleLines__ shows whether an account has multiple lines if it has phone service. So it does not make sense to include both of them in the model because the information in __PhoneService__ is nested in __MultipleLines__. Same thing with __InternetService__ and __OnlineSecurity__, __OnlineBackup__, __DeviceProtection__, __TechSupport__ and __StreamingMovies__, in that these additional add-on features are only relevant for accounts that have __InternetService__.
+
+1. Inference: to help them understand what kind of customers are leaving and propose a retention plan to decrease churn and improve revenues
+```{r}
+# drop customer id and phone service column
+churn_new = churn[-c(1,7)]
+# churn_new = churn[-c(1,7,9)]
+head(churn_new)
+m = glm(factor(Churn)~., data=churn_new, family=binomial)
+summary(m)
+```
+For inference, I fitted a general linear regression to find covariates that are significant. From the model summary, we can see that significant covariates are SeniorCitizen, tenure, MultipleLinesYes, InternetServiceFiber optic, InternetServiceNo, ContractOne year, ContractTwo year, PaperlessBillingYes, PaymentMethodElectronic check, and TotalCharges.
+
+To understand the effects of these covariates on churn rate, we look at the exponential of the coefficients.
+```{r}
+exp(m$coefficients)
+```
+Therefore, the interpretations of the significant covariates are the followings:
+SeniorCitizen: odds of churn for a senior citizen increases by 24%
+tenure: if the year of being a customer increases by 1 unit, the odds of churn decreases by 6%
+MultipleLinesYes: if customer signs up for multiple lines as opposed to a single line, the odds of churn increases by 56%
+InternetServiceFiber optic: if customer signs up for fiber optic internet service as opposed to DSL, the odds of churn increases by 474%
+InternetServiceNo: if customer has no internet service as opposed to DSL, the odds of churn decreases by 83%
+ContractOne year: if customer signs up for a one year contract as opposed to month-to-month contract, the odds of churn decreases by 48%.
+ContractTwo year: if customer signs up for a two year contract as opposed to month-to-month contract, the odds of churn decreases by 74%.
+PaperlessBillingYes: if customer signs up for paperless billing as opposed to no paperless billing, the odds of churn increases by 41% 
+PaymentMethodElectronic check: if customer chooses to pay by electronic check as opposed to automatic bank transfer, the odds of churn increases by 36% 
+TotalCharges: if customer's total charge increases by 1 unit, the odds of churn increases by 0.03%.
+
+Finally, based on the above findings, we are able to develop a retention plan to decrease churn and improve revenues. 
+First, we want to increase the rentention rate for senior citizens. We can start to build a new strategy to target senior citizens, for example creating internet packages that are more attractive to seniors. In addition, as tenure is positively correlated with churn decrease, we want to make sure that our customer start with our product and never swtich to other brands. As for the type of internet service and number of lines that the customer chooses, a DSL internet service and a single line is preffered. However, this might decrease the overall sales/revenues based on how the services are charged, and we need to conduct additional research to identify the best approach to decrease churn and improve revenues at the same time. In addition, we want to market and sell longer 2 year contract, such as by offering discount, as they could drastically decrease odds of churn (74%). Finally, it is interesting to see how paperless billing and electronic check payment actually increase churn rate. Maybe it is because electronic/online payment makes it convenient for customers to stop the payment and switch. Therefore we should make no paperless billing and automatic bank transfer as the default payment method to decrease churn rate. 
